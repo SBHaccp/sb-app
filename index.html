@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Smokin Bones — Invoices</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{--bg:#f5f6f8;--card:#fff;--ink:#1a1f2b;--muted:#6b7280;--line:#e7e9ee;--accent:#2f6df6;--green:#16a34a;--amber:#d97706;--red:#dc2626;color-scheme:light;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;}
+  .wrap{max-width:1120px;margin:0 auto;padding:20px 16px 60px;}
+  .topbar{display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap;}
+  .back{border:1px solid var(--line);background:#fff;border-radius:10px;padding:7px 12px;font-size:14px;cursor:pointer;display:none;}
+  h1{font-size:20px;margin:0;} .sub{color:var(--muted);font-size:13px;}
+  .who{margin-left:auto;display:flex;align-items:center;gap:10px;font-size:13px;color:var(--muted);}
+  .who select{font-size:13px;padding:6px 8px;border:1px solid var(--line);border-radius:8px;}
+  .who .out{cursor:pointer;color:var(--accent);}
+  .screen{display:none;} .screen.active{display:block;}
+  .home-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:16px;margin-top:26px;}
+  .home-btn{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:34px 20px;text-align:center;cursor:pointer;transition:.15s;}
+  .home-btn:hover{border-color:var(--accent);transform:translateY(-2px);}
+  .home-btn .ic{font-size:40px;} .home-btn .t{font-size:18px;font-weight:700;margin-top:10px;} .home-btn .d{font-size:13px;color:var(--muted);margin-top:4px;}
+  label{display:block;font-size:12px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin:14px 0 6px;}
+  select,input,button,textarea{font-size:15px;padding:11px 13px;border:1px solid var(--line);border-radius:11px;background:#fff;color:var(--ink);}
+  .full{width:100%;} .btn{background:var(--accent);color:#fff;border:none;font-weight:600;cursor:pointer;} .btn:disabled{opacity:.5}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:16px;} .card h3{margin:0 0 10px;font-size:15px;}
+  .shot{display:flex;flex-direction:column;align-items:center;gap:8px;border:2px dashed var(--line);border-radius:16px;padding:34px 16px;text-align:center;color:var(--muted);cursor:pointer;background:#fff;}
+  #preview{width:100%;border-radius:12px;margin-top:12px;display:none;} #capFile,#stmtFile{display:none;}
+  .status{margin-top:14px;padding:12px 14px;border-radius:11px;font-size:14px;display:none;}
+  .status.info{background:#eef4ff;color:#1e40af;display:block;} .status.ok{background:#ecfdf3;color:#166534;display:block;} .status.err{background:#fef2f2;color:#991b1b;display:block;}
+  table{width:100%;border-collapse:collapse;font-size:13px;} th,td{text-align:left;padding:7px 9px;border-bottom:1px solid var(--line);}
+  th{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.4px;} td.n,th.n{text-align:right;font-variant-numeric:tabular-nums;}
+  .kv{display:flex;justify-content:space-between;font-size:14px;padding:4px 0;border-bottom:1px solid var(--line);}
+  .tabs{display:flex;gap:6px;margin-bottom:16px;border-bottom:1px solid var(--line);}
+  .tab{padding:9px 14px;font-size:14px;cursor:pointer;border:none;background:none;color:var(--muted);border-bottom:2px solid transparent;} .tab.active{color:var(--accent);border-bottom-color:var(--accent);font-weight:600;}
+  .subpanel{display:none;} .subpanel.active{display:block;}
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:18px;} .kpi{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:15px;}
+  .kpi .l{font-size:11px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);} .kpi .v{font-size:20px;font-weight:700;margin-top:6px;}
+  .filters{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:14px;align-items:flex-end;} .filters .fld label{margin:0 0 4px;}
+  .pill{display:inline-block;padding:2px 8px;border-radius:20px;font-size:12px;font-weight:600;} .pill.miss{background:#fef2f2;color:#991b1b;} .pill.mis{background:#fff7ed;color:#9a3412;} .pill.ok{background:#ecfdf3;color:#166534;}
+  .cfg{margin:14px 0;font-size:12px;color:var(--muted);background:#fff;border:1px dashed var(--line);border-radius:10px;padding:10px 12px;}
+  .login{max-width:380px;margin:12vh auto 0;text-align:center;} .login .card{padding:26px;} .login h1{margin-bottom:4px;}
+  @media(max-width:760px){.kpis{grid-template-columns:repeat(2,1fr)}}
+</style>
+</head>
+<body>
+<!-- LOGIN -->
+<div class="login" id="login" style="display:none">
+  <div class="card">
+    <h1>Smokin Bones</h1>
+    <div class="sub" style="margin-bottom:18px">Sign in to continue</div>
+    <input id="loginEmail" class="full" type="email" placeholder="you@example.com" autocomplete="email">
+    <button class="btn full" id="loginBtn" style="margin-top:12px">Email me a sign-in link</button>
+    <div class="status" id="loginStatus"></div>
+  </div>
+  <div class="cfg" id="cfg" style="text-align:left">⚙️ Not connected — set SUPABASE_URL and ANON_KEY in the CONFIG block of this file.</div>
+</div>
+
+<!-- APP -->
+<div class="wrap" id="app" style="display:none">
+  <div class="topbar">
+    <button class="back" id="backBtn">← Home</button>
+    <div><h1 id="title">Smokin Bones</h1><div class="sub" id="subtitle">Invoices</div></div>
+    <div class="who">
+      <select id="restSwitch" style="display:none"></select>
+      <span id="whoEmail"></span>
+      <span class="out" id="signOut">Sign out</span>
+    </div>
+  </div>
+
+  <div class="screen active" id="home">
+    <div class="home-grid" id="homeGrid"></div>
+  </div>
+
+  <!-- CAPTURE -->
+  <div class="screen" id="capture">
+    <label for="capShop">Shop</label>
+    <select id="capShop" class="full"><option>Temple Bar</option><option>Castle Market</option><option>Swords</option><option>SB Catering</option></select>
+    <label>Invoice photo</label>
+    <div class="shot" onclick="document.getElementById('capFile').click()"><div style="font-size:34px">📷</div><div><strong>Tap to take a photo</strong><br>or choose from library</div></div>
+    <input type="file" id="capFile" accept="image/*" capture="environment">
+    <img id="preview" alt="preview">
+    <button class="btn full" id="capSubmit" style="margin-top:16px" disabled>Submit invoice</button>
+    <div class="status" id="capStatus"></div>
+    <div class="card" id="capResult" style="display:none;margin-top:16px;">
+      <h3>Extracted</h3><div id="capHeader"></div>
+      <table id="capLines"><thead><tr><th>Code</th><th>Description</th><th class="n">Qty</th><th class="n">Line</th></tr></thead><tbody></tbody></table>
+    </div>
+  </div>
+
+  <!-- DASHBOARD -->
+  <div class="screen" id="dash">
+    <div class="tabs"><button class="tab active" data-t="ov">Overview</button><button class="tab" data-t="inv">Invoices</button><button class="tab" data-t="rec">Reconcile</button></div>
+    <div class="subpanel active" id="ov">
+      <div class="filters">
+        <div class="fld"><label>Shop</label><select id="ovShop"><option value="">All shops</option><option>Temple Bar</option><option>Castle Market</option><option>Swords</option><option>SB Catering</option></select></div>
+        <div class="fld"><label>Supplier</label><input id="ovSupplier" placeholder="e.g. Conaty"></div>
+        <div class="fld"><label>From</label><input id="ovFrom" type="date"></div>
+        <div class="fld"><label>To</label><input id="ovTo" type="date"></div>
+        <button class="btn" id="ovRefresh">Refresh</button>
+      </div>
+      <div class="kpis" id="ovKpis"></div>
+      <div class="card"><h3>By shop</h3><table id="ovShopTbl"><thead><tr><th>Shop</th><th class="n">Invoices</th><th class="n">Gross</th></tr></thead><tbody></tbody></table></div>
+      <div class="card"><h3>Top suppliers</h3><table id="ovSupTbl"><thead><tr><th>Supplier</th><th class="n">Invoices</th><th class="n">Gross</th></tr></thead><tbody></tbody></table></div>
+    </div>
+    <div class="subpanel" id="inv">
+      <div class="filters">
+        <div class="fld"><label>Shop</label><select id="inShop"><option value="">All shops</option><option>Temple Bar</option><option>Castle Market</option><option>Swords</option><option>SB Catering</option></select></div>
+        <div class="fld"><label>Supplier</label><input id="inSupplier" placeholder="e.g. Conaty"></div>
+        <div class="fld"><label>Invoice #</label><input id="inSearch" placeholder="e.g. D77…"></div>
+        <div class="fld"><label>From</label><input id="inFrom" type="date"></div>
+        <div class="fld"><label>To</label><input id="inTo" type="date"></div>
+        <button class="btn" id="inRefresh">Search</button>
+      </div>
+      <div class="card"><table id="inTbl"><thead><tr><th>Date</th><th>Invoice #</th><th>Supplier</th><th>Shop</th><th>Category</th><th class="n">Gross</th></tr></thead><tbody></tbody></table></div>
+    </div>
+    <div class="subpanel" id="rec">
+      <div class="card">
+        <h3>Check a supplier statement for missing invoices</h3>
+        <div class="fld"><label>Supplier (optional)</label><input id="rcSupplier" placeholder="e.g. Conaty"></div>
+        <div class="shot" style="margin-top:12px" onclick="document.getElementById('stmtFile').click()">📄 Tap to upload the statement (PDF or photo)</div>
+        <input type="file" id="stmtFile" accept="image/*,application/pdf">
+        <div id="rcName" style="font-size:13px;color:var(--muted);margin-top:8px;"></div>
+        <button class="btn" id="rcRun" style="margin-top:12px" disabled>Find missing invoices</button>
+        <div class="status" id="rcStatus"></div>
+      </div>
+      <div class="card" id="rcResults" style="display:none;">
+        <h3>Result</h3><div id="rcSummary" style="margin-bottom:12px;font-size:14px;"></div>
+        <table id="rcMissing"><thead><tr><th>Status</th><th>Invoice #</th><th>Date</th><th class="n">Amount</th></tr></thead><tbody></tbody></table>
+      </div>
+    </div>
+  </div>
+
+  <!-- STOCKTAKE -->
+  <div class="screen" id="stock">
+    <div class="filters">
+      <div class="fld"><label>Shop (optional)</label><select id="stShop"><option value="">All / combined</option><option>Temple Bar</option><option>Castle Market</option><option>Swords</option><option>SB Catering</option></select></div>
+      <button class="btn" id="stReload">Reload list</button>
+      <div style="margin-left:auto;text-align:right"><div style="font-size:11px;color:var(--muted);text-transform:uppercase">Stock value</div><div id="stTotal" style="font-size:20px;font-weight:700">€0</div></div>
+    </div>
+    <div class="sub" style="margin-bottom:10px">Regular items covering 80% of spend (last 6 months). Enter what you physically have.</div>
+    <div class="status" id="stStatus"></div>
+    <div class="card"><table id="stTbl"><thead><tr><th>Item</th><th>Supplier</th><th class="n">Last €</th><th class="n">Count</th><th class="n">Value</th></tr></thead><tbody></tbody></table></div>
+    <button class="btn full" id="stSave" style="display:none">Save stocktake</button>
+  </div>
+
+  <!-- OWNER -->
+  <div class="screen" id="owner">
+    <div class="card"><h3>All restaurants</h3>
+      <table id="ownTbl"><thead><tr><th>Restaurant</th><th class="n">Invoices</th><th class="n">Gross</th><th>Last invoice</th><th></th></tr></thead><tbody></tbody></table>
+    </div>
+    <div class="sub">Tap a restaurant to load its dashboard, or use the switcher top-right.</div>
+  </div>
+
+  <!-- ADMIN -->
+  <div class="screen" id="admin">
+    <div class="card"><h3>Restaurants</h3>
+      <table id="admRestTbl"><thead><tr><th>Name</th><th class="n">ID</th></tr></thead><tbody></tbody></table>
+      <div class="filters" style="margin-top:12px"><div class="fld"><label>New restaurant name</label><input id="admNewRest" placeholder="e.g. Novus Yibu"></div><button class="btn" id="admAddRest">Add restaurant</button></div>
+    </div>
+    <div class="card"><h3>Users</h3>
+      <table id="admUserTbl"><thead><tr><th>Email</th><th>Role</th><th>Restaurant</th></tr></thead><tbody></tbody></table>
+      <div class="filters" style="margin-top:12px">
+        <div class="fld"><label>Invite email</label><input id="admEmail" type="email" placeholder="person@email.com"></div>
+        <div class="fld"><label>Role</label><select id="admRole"><option value="staff">Staff</option><option value="manager">Manager</option><option value="owner">Owner</option></select></div>
+        <div class="fld"><label>Restaurant</label><select id="admRest"></select></div>
+        <button class="btn" id="admInvite">Send invite</button>
+      </div>
+      <div class="status" id="admStatus"></div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ================= CONFIG =================
+const SUPABASE_URL = "https://dnrfmcrgqgmxzxopsxzv.supabase.co";
+const ANON_KEY     = "sb_publishable_ioGWWgaVpdmJHQJWmuaVXw_P-PLG8Sw";  // Supabase publishable (public) key
+// =========================================
+
+const EUR = v => v==null?'—':'€'+Number(v).toLocaleString('en-IE',{maximumFractionDigits:0});
+const EUR2 = v => v==null?'—':'€'+Number(v).toLocaleString('en-IE',{minimumFractionDigits:2,maximumFractionDigits:2});
+const esc = s => String(s==null?'':s).replace(/[&<>]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]));
+const SUBTITLES = {home:'Invoices',capture:'Capture invoice',dash:'Dashboard',stock:'Stocktake',owner:'All restaurants',admin:'Admin'};
+
+let sb=null, ME={role:'staff',restaurant_id:null,email:''}, ACTIVE_REST=null, RESTAURANTS=[];
+
+// ---- boot ----
+window.addEventListener('load', async ()=>{
+  if(!ANON_KEY){ document.getElementById('login').style.display='block'; return; }
+  sb = supabase.createClient(SUPABASE_URL, ANON_KEY);
+  document.getElementById('cfg').style.display='none';
+  const { data:{ session } } = await sb.auth.getSession();
+  if(session) await onLogin(session); else document.getElementById('login').style.display='block';
+  sb.auth.onAuthStateChange((_e, s)=>{ if(s) onLogin(s); });
+});
+document.getElementById('loginBtn').onclick = async ()=>{
+  const email=document.getElementById('loginEmail').value.trim(); const st=document.getElementById('loginStatus');
+  if(!email){st.className='status err';st.textContent='Enter your email.';return;}
+  st.className='status info';st.textContent='Sending…';
+  const { error } = await sb.auth.signInWithOtp({ email, options:{ emailRedirectTo: window.location.href } });
+  if(error){st.className='status err';st.textContent=error.message;} else {st.className='status ok';st.textContent='Check your email for the sign-in link.';}
+};
+document.getElementById('signOut').onclick = async ()=>{ await sb.auth.signOut(); location.reload(); };
+
+async function onLogin(session){
+  ME.email = session.user.email;
+  const { data:prof } = await sb.from('profiles').select('role,restaurant_id').eq('id', session.user.id).single();
+  if(prof){ ME.role=prof.role; ME.restaurant_id=prof.restaurant_id; }
+  ACTIVE_REST = ME.role==='owner' ? null : ME.restaurant_id;
+  document.getElementById('login').style.display='none';
+  document.getElementById('app').style.display='block';
+  document.getElementById('whoEmail').textContent = ME.email+' · '+ME.role;
+  buildHome();
+  if(ME.role==='owner'){ await loadRestaurants(); buildSwitcher(); }
+  go('home');
+}
+
+// ---- role-gated home ----
+function buildHome(){
+  const btns=[];
+  const cap = {id:'capture',ic:'📸',t:'Capture invoice',d:'Snap a supplier invoice'};
+  const dash= {id:'dash',ic:'📊',t:'Dashboard',d:'Totals, invoices & reconcile'};
+  const stk = {id:'stock',ic:'🧮',t:'Stocktake',d:'Count your key items'};
+  const own = {id:'owner',ic:'🏢',t:'All restaurants',d:'Compare & drill in'};
+  const adm = {id:'admin',ic:'⚙️',t:'Admin',d:'Restaurants & users'};
+  if(ME.role==='staff'){ btns.push(cap); }
+  else if(ME.role==='manager'){ btns.push(cap,dash,stk); }
+  else { btns.push(cap,dash,stk,own,adm); }
+  document.getElementById('homeGrid').innerHTML = btns.map(b=>`<div class="home-btn" onclick="go('${b.id}')"><div class="ic">${b.ic}</div><div class="t">${b.t}</div><div class="d">${b.d}</div></div>`).join('');
+}
+function buildSwitcher(){
+  const sel=document.getElementById('restSwitch'); sel.style.display='inline-block';
+  sel.innerHTML='<option value="">All restaurants</option>'+RESTAURANTS.map(r=>`<option value="${r.id}">${esc(r.name)}</option>`).join('');
+  sel.onchange=()=>{ ACTIVE_REST = sel.value?+sel.value:null; if(document.getElementById('dash').classList.contains('active')) loadOverview().catch(()=>{}); };
+}
+
+function go(id){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  document.getElementById('backBtn').style.display = id==='home'?'none':'inline-block';
+  document.getElementById('subtitle').textContent = SUBTITLES[id];
+  if(id==='dash') loadOverview().catch(()=>{});
+  if(id==='stock') loadStocktake().catch(()=>{});
+  if(id==='owner') loadOwner().catch(()=>{});
+  if(id==='admin') loadAdmin().catch(()=>{});
+}
+document.getElementById('backBtn').onclick = ()=>go('home');
+
+// ---- call helper (auth-aware via supabase client) ----
+async function call(fn, body){ const { data, error } = await sb.functions.invoke(fn, { body }); if(error) throw new Error(error.message); if(data && data.error) throw new Error(data.error); return data; }
+
+// ---- CAPTURE ----
+let capData=null;
+document.getElementById('capFile').addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;const r=new FileReader();r.onload=ev=>{capData=ev.target.result;const p=document.getElementById('preview');p.src=capData;p.style.display='block';document.getElementById('capSubmit').disabled=false;document.getElementById('capResult').style.display='none';document.getElementById('capStatus').style.display='none';};r.readAsDataURL(f);});
+document.getElementById('capSubmit').onclick=async()=>{
+  if(!capData)return; const st=document.getElementById('capStatus'); document.getElementById('capSubmit').disabled=true;
+  st.className='status info';st.textContent='Reading the invoice… a few seconds.';
+  try{
+    const d=await call('ingest-invoice',{shop:document.getElementById('capShop').value,image:capData,restaurant_id:ACTIVE_REST});
+    const inv=d.invoice||{};
+    document.getElementById('capHeader').innerHTML=kv('Supplier',inv.supplier)+kv('Invoice #',inv.invoice_no)+kv('Date',inv.invoice_date)+kv('Shop',inv.shop)+kv('Net',EUR2(inv.net))+kv('VAT',EUR2(inv.vat))+kv('Gross',EUR2(inv.gross));
+    document.querySelector('#capLines tbody').innerHTML=(d.lines||[]).map(l=>`<tr><td>${esc(l.supplier_code)}</td><td>${esc(l.description)}</td><td class="n">${esc(l.qty)}</td><td class="n">${EUR2(l.line_gross)}</td></tr>`).join('');
+    document.getElementById('capResult').style.display='block'; st.className='status ok'; st.textContent='Saved to database and logged to Dext ✓';
+  }catch(e){st.className='status err';st.textContent='Couldn\'t process: '+e.message;document.getElementById('capSubmit').disabled=false;}
+};
+function kv(k,v){return `<div class="kv"><span>${k}</span><strong>${v==null||v===''?'—':esc(v)}</strong></div>`;}
+
+// ---- DASHBOARD ----
+document.querySelectorAll('.tab').forEach(t=>t.onclick=()=>{document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));document.querySelectorAll('.subpanel').forEach(x=>x.classList.remove('active'));t.classList.add('active');document.getElementById(t.dataset.t).classList.add('active');});
+async function loadOverview(){
+  const d=await call('dashboard-data',{restaurant:ACTIVE_REST,shop:document.getElementById('ovShop').value||null,supplier:document.getElementById('ovSupplier').value||null,from:document.getElementById('ovFrom').value||null,to:document.getElementById('ovTo').value||null,limit:0});
+  const g=d.global||{};
+  document.getElementById('ovKpis').innerHTML=k('Invoices',(g.invoices||0).toLocaleString())+k('Gross',EUR(g.gross))+k('Net',EUR(g.net))+k('VAT',EUR(g.vat));
+  document.querySelector('#ovShopTbl tbody').innerHTML=(d.by_shop||[]).map(s=>`<tr><td>${esc(s.shop)}</td><td class="n">${(s.invoices||0).toLocaleString()}</td><td class="n">${EUR(s.gross)}</td></tr>`).join('');
+  document.querySelector('#ovSupTbl tbody').innerHTML=(d.top_suppliers||[]).map(s=>`<tr><td>${esc(s.supplier)}</td><td class="n">${(s.invoices||0).toLocaleString()}</td><td class="n">${EUR(s.gross)}</td></tr>`).join('');
+}
+function k(l,v){return `<div class="kpi"><div class="l">${l}</div><div class="v">${v}</div></div>`;}
+async function loadInvoices(){
+  const d=await call('dashboard-data',{restaurant:ACTIVE_REST,shop:document.getElementById('inShop').value||null,supplier:document.getElementById('inSupplier').value||null,search:document.getElementById('inSearch').value||null,from:document.getElementById('inFrom').value||null,to:document.getElementById('inTo').value||null,limit:200});
+  document.querySelector('#inTbl tbody').innerHTML=(d.invoices||[]).map(r=>`<tr><td>${esc(r.invoice_date)}</td><td>${esc(r.invoice_no)}</td><td>${esc(r.supplier)}</td><td>${esc(r.shop)}</td><td>${esc(r.category)}</td><td class="n">${EUR2(r.gross)}</td></tr>`).join('')||'<tr><td colspan="6" style="color:var(--muted)">No matching invoices.</td></tr>';
+}
+document.getElementById('ovRefresh').onclick=()=>loadOverview().catch(e=>alert(e.message));
+document.getElementById('inRefresh').onclick=()=>loadInvoices().catch(e=>alert(e.message));
+
+// ---- RECONCILE ----
+let stmtData=null;
+document.getElementById('stmtFile').addEventListener('change',e=>{const f=e.target.files[0];if(!f)return;document.getElementById('rcName').textContent=f.name;const r=new FileReader();r.onload=ev=>{stmtData=ev.target.result;document.getElementById('rcRun').disabled=false;};r.readAsDataURL(f);});
+document.getElementById('rcRun').onclick=async()=>{
+  if(!stmtData)return; const st=document.getElementById('rcStatus'); document.getElementById('rcRun').disabled=true;
+  st.className='status info';st.textContent='Reading the statement and comparing…';
+  try{
+    const d=await call('reconcile-statement',{supplier:document.getElementById('rcSupplier').value||null,image:stmtData,restaurant_id:ACTIVE_REST});
+    const miss=d.missing||[],mis=d.mismatched||[];
+    document.getElementById('rcResults').style.display='block';
+    document.getElementById('rcSummary').innerHTML=`Statement lists <strong>${d.statement_count||0}</strong> invoices · <span class="pill ok">${d.matched||0} matched</span> <span class="pill miss">${miss.length} missing</span> <span class="pill mis">${mis.length} mismatch</span>`+(miss.length?` · missing total ${EUR2(d.missing_total)}`:'');
+    document.querySelector('#rcMissing tbody').innerHTML=(miss.map(m=>`<tr><td><span class="pill miss">Missing</span></td><td>${esc(m.invoice_no)}</td><td>${esc(m.date)}</td><td class="n">${EUR2(m.amount)}</td></tr>`).concat(mis.map(m=>`<tr><td><span class="pill mis">Mismatch</span></td><td>${esc(m.invoice_no)}</td><td>—</td><td class="n">stmt ${EUR2(m.statement_amount)} / db ${EUR2(m.db_gross)}</td></tr>`))).join('')||'<tr><td colspan="4" style="color:var(--green)">All statement invoices are in the database ✓</td></tr>';
+    st.style.display='none';
+  }catch(e){st.className='status err';st.textContent='Error: '+e.message;}
+  document.getElementById('rcRun').disabled=false;
+};
+
+// ---- STOCKTAKE ----
+let stItems=[];
+async function loadStocktake(){
+  const st=document.getElementById('stStatus'); st.className='status info'; st.textContent='Loading your key items…';
+  try{
+    const d=await call('stocktake',{action:'list',restaurant:ACTIVE_REST});
+    stItems=Array.isArray(d)?d:[]; renderStock();
+    document.getElementById('stSave').style.display=stItems.length?'block':'none';
+    if(!stItems.length){st.className='status info';st.textContent='No items yet — this fills once captured invoices have line items.';} else st.style.display='none';
+  }catch(e){st.className='status err';st.textContent='Error: '+e.message;}
+}
+function renderStock(){
+  document.querySelector('#stTbl tbody').innerHTML=stItems.map((it,i)=>`<tr><td>${esc(it.description)} ${it.unit?'<span style="color:var(--muted)">('+esc(it.unit)+')</span>':''}</td><td>${esc(it.supplier)}</td><td class="n">${EUR2(it.last_price)}</td><td class="n"><input type="number" min="0" step="any" data-i="${i}" style="width:78px;text-align:right" oninput="stCalc()"></td><td class="n" id="stv${i}">—</td></tr>`).join('');
+  stCalc();
+}
+function stCalc(){let total=0;document.querySelectorAll('#stTbl input[data-i]').forEach(inp=>{const i=+inp.dataset.i,q=parseFloat(inp.value),price=Number(stItems[i].last_price)||0,cell=document.getElementById('stv'+i);if(!isNaN(q)){const v=q*price;total+=v;cell.textContent=EUR2(v);}else cell.textContent='—';});document.getElementById('stTotal').textContent=EUR(total);}
+document.getElementById('stReload').onclick=()=>loadStocktake().catch(e=>alert(e.message));
+document.getElementById('stSave').onclick=async()=>{
+  const items=[];document.querySelectorAll('#stTbl input[data-i]').forEach(inp=>{const q=parseFloat(inp.value);if(isNaN(q))return;const it=stItems[+inp.dataset.i];items.push({item_key:it.item_key,supplier:it.supplier,description:it.description,unit:it.unit,counted_qty:q,unit_price:it.last_price});});
+  const st=document.getElementById('stStatus'); if(!items.length){st.className='status err';st.textContent='Enter at least one count first.';return;}
+  st.className='status info';st.textContent='Saving…';
+  try{const d=await call('stocktake',{action:'save',restaurant:ACTIVE_REST,shop:document.getElementById('stShop').value||null,items});st.className='status ok';st.textContent='Stocktake saved ✓ ('+(d.saved||items.length)+' items)';}
+  catch(e){st.className='status err';st.textContent='Error: '+e.message;}
+};
+
+// ---- OWNER ----
+async function loadRestaurants(){ RESTAURANTS = await call('admin',{action:'restaurants_list'}) || []; }
+async function loadOwner(){
+  const rows = await call('admin',{action:'restaurants_summary'}) || [];
+  document.querySelector('#ownTbl tbody').innerHTML = rows.map(r=>`<tr><td>${esc(r.restaurant)}</td><td class="n">${(r.invoices||0).toLocaleString()}</td><td class="n">${EUR(r.gross)}</td><td>${esc(r.last_invoice)}</td><td><button class="btn" style="padding:5px 10px" onclick="openRest(${r.restaurant_id})">Open</button></td></tr>`).join('');
+}
+function openRest(id){ ACTIVE_REST=id; const sel=document.getElementById('restSwitch'); if(sel) sel.value=String(id); go('dash'); }
+
+// ---- ADMIN ----
+async function loadAdmin(){
+  const rests = await call('admin',{action:'restaurants_list'}) || []; RESTAURANTS=rests;
+  document.querySelector('#admRestTbl tbody').innerHTML = rests.map(r=>`<tr><td>${esc(r.name)}</td><td class="n">${r.id}</td></tr>`).join('');
+  document.getElementById('admRest').innerHTML = rests.map(r=>`<option value="${r.id}">${esc(r.name)}</option>`).join('');
+  const users = await call('admin',{action:'users_list'}) || [];
+  const byId = Object.fromEntries(rests.map(r=>[r.id,r.name]));
+  document.querySelector('#admUserTbl tbody').innerHTML = users.map(u=>`<tr><td>${esc(u.email)}</td><td>${esc(u.role)}</td><td>${esc(u.restaurant_id?byId[u.restaurant_id]:'(all)')}</td></tr>`).join('');
+}
+document.getElementById('admAddRest').onclick=async()=>{
+  const name=document.getElementById('admNewRest').value.trim(); const st=document.getElementById('admStatus'); if(!name)return;
+  try{ await call('admin',{action:'restaurant_create',name}); document.getElementById('admNewRest').value=''; loadAdmin(); st.className='status ok';st.textContent='Restaurant added ✓'; }
+  catch(e){st.className='status err';st.textContent='Error: '+e.message;}
+};
+document.getElementById('admInvite').onclick=async()=>{
+  const email=document.getElementById('admEmail').value.trim(); const role=document.getElementById('admRole').value;
+  const restaurant_id = role==='owner'?null:(+document.getElementById('admRest').value||null);
+  const st=document.getElementById('admStatus'); if(!email){st.className='status err';st.textContent='Enter an email.';return;}
+  st.className='status info';st.textContent='Sending invite…';
+  try{ await call('admin',{action:'user_invite',email,role,restaurant_id}); document.getElementById('admEmail').value=''; loadAdmin(); st.className='status ok';st.textContent='Invite sent ✓'; }
+  catch(e){st.className='status err';st.textContent='Error: '+e.message;}
+};
+</script>
+</body>
+</html>
